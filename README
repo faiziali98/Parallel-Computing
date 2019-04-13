@@ -1,0 +1,26 @@
+# Cardiac Electrophysiology Simulation
+
+I have added code for 1D and 2D version of the assignment in files:
+
+1. cardiacsim.C (2D)
+2. cardiacsim_1D.C (1D)
+
+You can run the code using commands:
+
+make
+mpirun -n (number of threads) ./cardiacsim -n (grid size) -t (time step)
+
+To run serial code, copy the code from cardiacsimSerial.C to cardiacsim.C, in arch.gnu
+comment the MPI flag and then run:
+
+make
+./cardiacsim -n (grid size) -t (time step)
+
+For now, I had to copy the code to compile the code, try to change the 
+make file so that we do not need that
+
+Last but not least, we still have to:
+
+1. Use openMP
+2. Optamize the code according to the last few lectures
+3. Test the code
