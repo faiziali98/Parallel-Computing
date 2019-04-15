@@ -2,8 +2,9 @@
 
 I have added code for 1D and 2D version of the assignment in files:
 
-1. cardiacsim.C (2D)
-2. cardiacsim_1D.C (1D)
+1. cardiacsimSerial.C (Serial)
+2. cardiacsim1D.C (1D Version)
+3. cardiacsim2D.C (2D Version)
 
 You can run the code using commands:
 
