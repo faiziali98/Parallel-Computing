@@ -4,13 +4,19 @@ include ./arch.gnu
 # DEBUG += -g
 
 
-app:		cardiacsim
+app:		cardiacsim2D cardiacsim1D cardiacsimSerial
 
-OBJECTS = cardiacsim.o splot.o cmdLine.o
+OBJECTSSerial = cardiacsimSerial.o splot.o cmdLine.o
+OBJECTS1D = cardiacsim1D.o splot.o cmdLine.o
+OBJECTS2D = cardiacsim2D.o splot.o cmdLine.o
 
-cardiacsim:	        $(OBJECTS) 
-		$(C++LINK) $(LDFLAGS) -o $@ $(OBJECTS)  $(LDLIBS)
+cardiacsimSerial:	        $(OBJECTSSerial) 
+		$(C++LINK) $(LDFLAGS) -o $@ $(OBJECTSSerial)  $(LDLIBS)
+cardiacsim1D:	        $(OBJECTS1D) 
+		$(C++LINK) $(LDFLAGS) -o $@ $(OBJECTS1D)  $(LDLIBS)
+cardiacsim2D:	        $(OBJECTS2D) 
+		$(C++LINK) $(LDFLAGS) -o $@ $(OBJECTS2D)  $(LDLIBS)
 
 clean:	
-	$(RM) *.o cardiacsim *~;
+	$(RM) *.o cardiacsim1D cardiacsimSerial cardiacsim2D;
 	$(RM) core;
