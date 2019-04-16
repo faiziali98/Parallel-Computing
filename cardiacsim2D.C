@@ -84,14 +84,14 @@ void simulate(double **E, double **E_prev, double **R,
 			  const double alpha, const int n, const int m, const double kk,
 			  const double dt, const double a, const double epsilon,
 			  const double M1, const double M2, const double b, const int my_rank,
-			  const int t_p)
+			  const int px, const int py, const int mr, const int mc, const int ncomm)
 {
 	int i, j;
-	int sqroot = sqrt(t_p);
 	double *tSendl, *tRecvl, *tSendr, *tRecvr;
 
-	int tj = my_rank / sqroot;
-	int ti = my_rank % sqroot;
+	int tj = my_rank / px;
+	int ti = my_rank % px;
+
 
 	MPI_Request recv_request[4];
 	MPI_Request send_request[4];
@@ -106,67 +106,74 @@ void simulate(double **E, double **E_prev, double **R,
 	*/
 
 	// For Top row
-	if (tj > 0)
-	{
-		int dest_proc = my_rank - sqroot;
-		int src_proc = dest_proc;
-
-		MPI_Isend(&(E_prev[1][1]), n, MPI_DOUBLE, dest_proc,
-				  1, MPI_COMM_WORLD, &send_request[0]);
-		MPI_Irecv(&(E_prev[0][1]), n, MPI_DOUBLE, src_proc,
-				  2, MPI_COMM_WORLD, &recv_request[0]);
-	}
-
-	//For Bottom row
-	if (tj < sqroot - 1)
-	{
-		int dest_proc = my_rank + sqroot;
-		int src_proc = dest_proc;
-
-		MPI_Isend(&(E_prev[m][1]), n, MPI_DOUBLE, dest_proc,
-				  2, MPI_COMM_WORLD, &send_request[1]);
-		MPI_Irecv(&(E_prev[m + 1][1]), n, MPI_DOUBLE, src_proc,
-				  1, MPI_COMM_WORLD, &recv_request[1]);
-	}
-
-	//For left coloumn
-	if (ti > 0)
-	{
-		int dest_proc = my_rank - 1;
-		int src_proc = dest_proc;
-
-		tSendl = (double *)(malloc(sizeof(double) * m));
-		tRecvl = (double *)(malloc(sizeof(double) * m));
-
-		for (j = 1; j <= m; j++)
+	if (ncomm == 0){
+		if (tj > 0)
 		{
-			tSendl[j - 1] = E_prev[j][1];
+			int dest_proc = my_rank - px;
+			// cout<< "Here 0 " << dest_proc <<endl;
+			int src_proc = dest_proc;
+
+			MPI_Isend(&(E_prev[1][1]), n, MPI_DOUBLE, dest_proc,
+					1, MPI_COMM_WORLD, &send_request[0]);
+			MPI_Irecv(&(E_prev[0][1]), n, MPI_DOUBLE, src_proc,
+					2, MPI_COMM_WORLD, &recv_request[0]);
 		}
 
-		MPI_Isend(tSendl, m, MPI_DOUBLE, dest_proc,
-				  3, MPI_COMM_WORLD, &send_request[2]);
-		MPI_Irecv(tRecvl, m, MPI_DOUBLE, src_proc,
-				  4, MPI_COMM_WORLD, &recv_request[2]);
-	}
-
-	//For Right coloumn
-	if (ti < sqroot - 1)
-	{
-		int dest_proc = my_rank + 1;
-		int src_proc = dest_proc;
-
-		tSendr = (double *)(malloc(sizeof(double) * m));
-		tRecvr = (double *)(malloc(sizeof(double) * m));
-
-		for (j = 1; j <= m; j++)
+		//For Bottom row
+		if (tj < py - 1)
 		{
-			tSendr[j - 1] = E_prev[j][n];
+			int dest_proc = my_rank + px;
+			int src_proc = dest_proc;
+			// cout << "Here 1 " << dest_proc << endl;
+
+			MPI_Isend(&(E_prev[m][1]), n, MPI_DOUBLE, dest_proc,
+					2, MPI_COMM_WORLD, &send_request[1]);
+			MPI_Irecv(&(E_prev[m + 1][1]), n, MPI_DOUBLE, src_proc,
+					1, MPI_COMM_WORLD, &recv_request[1]);
 		}
 
-		MPI_Isend(tSendr, m, MPI_DOUBLE, dest_proc,
-				  4, MPI_COMM_WORLD, &send_request[3]);
-		MPI_Irecv(tRecvr, m, MPI_DOUBLE, src_proc,
-				  3, MPI_COMM_WORLD, &recv_request[3]);
+		//For left coloumn
+		if (ti > 0)
+		{
+			int dest_proc = my_rank - 1;
+			int src_proc = dest_proc;
+			// cout << "Here 2 " << dest_proc << endl;
+
+			tSendl = (double *)(malloc(sizeof(double) * m));
+			tRecvl = (double *)(malloc(sizeof(double) * m));
+
+			// cout << sizeof(E_prev) << endl;
+			for (j = 1; j <= m; j++)
+			{
+				tSendl[j - 1] = E_prev[j][1];
+			}
+
+			MPI_Isend(tSendl, m, MPI_DOUBLE, dest_proc,
+					3, MPI_COMM_WORLD, &send_request[2]);
+			MPI_Irecv(tRecvl, m, MPI_DOUBLE, src_proc,
+					4, MPI_COMM_WORLD, &recv_request[2]);
+		}
+
+		//For Right coloumn
+		if (ti < px - 1)
+		{
+			int dest_proc = my_rank + 1;
+			int src_proc = dest_proc;
+			// cout << "Here 3 " << dest_proc << endl;
+
+			tSendr = (double *)(malloc(sizeof(double) * m));
+			tRecvr = (double *)(malloc(sizeof(double) * m));
+
+			for (j = 1; j <= m; j++)
+			{
+				tSendr[j - 1] = E_prev[j][n];
+			}
+
+			MPI_Isend(tSendr, m, MPI_DOUBLE, dest_proc,
+					4, MPI_COMM_WORLD, &send_request[3]);
+			MPI_Irecv(tRecvr, m, MPI_DOUBLE, src_proc,
+					3, MPI_COMM_WORLD, &recv_request[3]);
+		}
 	}
 
 	MPI_Barrier(MPI_COMM_WORLD);
@@ -176,7 +183,7 @@ void simulate(double **E, double **E_prev, double **R,
 		for (i = 1; i <= n; i++)
 			E_prev[0][i] = E_prev[2][i];
 	}
-	if (tj == sqroot - 1)
+	if (tj == py - 1)
 	{
 		for (i = 1; i <= n; i++)
 			E_prev[m + 1][i] = E_prev[m - 1][i];
@@ -187,68 +194,75 @@ void simulate(double **E, double **E_prev, double **R,
 		for (j = 1; j <= m; j++)
 			E_prev[j][0] = E_prev[j][2];
 	}
-	if (ti == sqroot - 1)
+	if (ti == px - 1)
 	{
 		for (j = 1; j <= m; j++)
 			E_prev[j][n + 1] = E_prev[j][n - 1];
 	}
 
-	if (ti > 0)
+	if (ncomm == 0)
 	{
+		if (ti > 0)
+		{
+			for (j = 1; j <= m; j++)
+			{
+				E_prev[j][0] = tRecvl[j - 1];
+			}
+		}
+		if (ti < px - 1)
+		{
+			for (j = 1; j <= m; j++)
+			{
+				E_prev[j][n + 1] = tRecvr[j - 1];
+			}
+		}
+	}
+
+		// for (j = 0; j <= m + 1; j++)
+		// {
+		// 	cout << "Here " << my_rank << " ----- " << j;
+		// 	for (i = 0; i <= n + 1; i++)
+		// 		if ((j == 0 || j == m+1) and (i == 0 || i ==n+1)){
+		// 			cout << " " << "*";
+		// 		}else{
+		// 			cout << " " << E_prev[j][i];
+		// 		}
+		// 	cout << endl;
+		// }
+
+		// Solve for the excitation, the PDE
 		for (j = 1; j <= m; j++)
 		{
-			E_prev[j][0] = tRecvl[j - 1];
+			for (i = 1; i <= n; i++)
+			{
+				E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
+			}
 		}
-	}
-	if (ti < sqroot - 1)
-	{
+
+		// // // /*
+		// // // * Solve the ODE, advancing excitation and recovery to the
+		// // // *     next timtestep
+		// // // */
+
 		for (j = 1; j <= m; j++)
 		{
-			E_prev[j][n + 1] = tRecvr[j - 1];
+			int jIndc = j + (mr * tj);
+			for (i = 1; i <= n; i++)
+			{
+				int iIndc = i + (mc * ti);
+				E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[jIndc][iIndc]);
+			}
 		}
-	}
 
-	// for (j = 1; j <= m; j++)
-	// {
-	// 	cout << "Here " << my_rank << " ----- " << j;
-	// 	for (i = 1; i <= n; i++)
-	// 		cout << " " << E_prev[j][i];
-	// 	cout << endl;
-	// }
-
-	// Solve for the excitation, the PDE
-	for (j = 1; j <= m; j++)
-	{
-		for (i = 1; i <= n; i++)
+		for (j = 1; j <= m; j++)
 		{
-			E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
+			int jIndc = j + (mr * tj);
+			for (i = 1; i <= n; i++)
+			{
+				int iIndc = i + (mc * ti);
+				R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
+			}
 		}
-	}
-
-	// // /*
-	// // * Solve the ODE, advancing excitation and recovery to the
-	// // *     next timtestep
-	// // */
-
-	for (j = 1; j <= m; j++)
-	{
-		int jIndc = j + (m * tj);
-		for (i = 1; i <= n; i++)
-		{
-			int iIndc = i + (n * ti);
-			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[jIndc][iIndc]);
-		}
-	}
-
-	for (j = 1; j <= m; j++)
-	{
-		int jIndc = j + (m * tj);
-		for (i = 1; i <= n; i++)
-		{
-			int iIndc = i + (n * ti);
-			R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
-		}
-	}
 }
 
 // Main program
@@ -280,6 +294,11 @@ int main(int argc, char **argv)
 	int num_threads = 1;
 
 	cmdLine(argc, argv, T, n, px, py, plot_freq, no_comm, num_threads);
+
+	if (world_size != (px*py)){
+		return 0;
+	}
+
 	m = n;
 	// Allocate contiguous memory for solution arrays
 	// The computational box is defined on [1:m+1,1:n+1]
@@ -313,25 +332,62 @@ int main(int argc, char **argv)
 	double alpha = d * dt / (dx * dx);
 
 	double **myE, **myEprev;
-	int sqroot = sqrt(world_size);
 
-	int my_rows = m / sqroot;
-	int my_cols = my_rows;
-	int tj = my_rank / sqroot;
-	int ti = my_rank % sqroot;
+	int tj = my_rank / px;
+	int ti = my_rank % px;
 
-	// if (my_rank < world_size - 1){
-	// 	my_rows += m - (my_rows*world_size);
-	// }
+	int ndr, ndc, my_rows, my_cols, multr, multc;
+	// int sqroot = sqrt(world_size);
 
-	myEprev = alloc2D(my_rows + 2, n + 2);
-	myE = alloc2D(my_cols + 2, n + 2);
+	if ((m % py) != 0){
+		
+		ndr = m;
+		while (ndr % py != 0)
+			ndr ++;
+
+		multr = (ndr / py);
+		if (tj == (py - 1)){
+			my_rows = n - (multr * (py - 1));
+		}else{
+			my_rows = multr;
+		}
+		
+	} else {
+		my_rows = m / py;
+		multr = my_rows;
+	}
+
+	if ((n % px) != 0)
+	{
+
+		ndc = n;
+		while (ndc % px != 0)
+			ndc++;
+
+		multc = (ndr / py);
+		if (ti == (px - 1)){
+			my_cols = n - (multc * (py - 1));
+		}
+		else{
+			my_cols = multc;
+		}
+	}
+	else
+	{
+		my_cols = n / px;
+		multc = my_cols;
+	}
+
+	// cout << my_rank << " " <<my_rows<< " " <<my_cols <<endl;
+
+	myEprev = alloc2D(my_rows + 2, my_cols + 2);
+	myE = alloc2D(my_rows + 2, my_cols + 2);
 
 	for (j = 1; j <= my_rows; j++)
 	{
 		for (i = 1; i <= my_cols; i++)
 		{
-			myEprev[j][i] = E_prev[j + (my_rows * tj)][i + (my_cols * ti)];
+			myEprev[j][i] = E_prev[j + (multr * tj)][i + (multc * ti)];
 		}
 	}
 
@@ -360,14 +416,18 @@ int main(int argc, char **argv)
 			sendcounts[i] = 1;
 
 		int disp = 0;
-		for (i = 0; i < sqroot; i++)
+		for (i = 0; i < py; i++)
 		{
-			for (j = 0; j < sqroot; j++)
+			for (j = 0; j < px; j++)
 			{
-				displs[i * (sqroot) + j] = disp;
+				displs[i * (px) + j] = disp;
 				disp += 1;
 			}
-			disp += ((m / (sqroot)) - 1) * (sqroot);
+			if (i != py-1){
+				disp += (((m / (py)) - 1) * (px)) + (m % py);
+			}else{
+				disp += (((m / (py)) - 1) * (px)) + (m % py);
+			}
 		}
 
 		cout << "Grid Size       : " << n << endl;
@@ -379,8 +439,6 @@ int main(int argc, char **argv)
 			cout << "Communication   : DISABLED" << endl;
 		cout << endl;
 	}
-	// Start the timer
-	double t0 = getTime();
 
 	// Simulated time is different from the integer timestep number
 	// Simulated time
@@ -392,12 +450,16 @@ int main(int argc, char **argv)
 	tmp1 = alloc2D(my_rows, my_cols);
 	globaltmp = alloc2D(m, n);
 
+	// Start the timer
+	double t0 = getTime();
+
 	while (t < T)
 	{
 		t += dt;
 		niter++;
 
-		simulate(myE, myEprev, R, alpha, my_cols, my_rows, kk, dt, a, epsilon, M1, M2, b, my_rank, world_size);
+		simulate(myE, myEprev, R, alpha, my_cols, my_rows, kk, dt, a, epsilon, 
+				M1, M2, b, my_rank, px, py, multr, multc, no_comm);
 
 		//swap current E with previous E
 		double **tmp = myE;
@@ -409,7 +471,6 @@ int main(int argc, char **argv)
 			int k = (int)(t / plot_freq);
 			if ((t - k * plot_freq) < dt)
 			{
-				// MPI_Gatherv(&(myE[1][0]), my_rows * (n + 2), MPI_DOUBLE, &(E[1][0]), sendcounts, displs, subarray, 0, MPI_COMM_WORLD);
 				for (j = 1; j <= my_rows; j++){
 					for (i = 1; i <= my_cols; i++){
 						tmp1[j-1][i-1] = myE[j][i];
@@ -417,7 +478,7 @@ int main(int argc, char **argv)
 				}
 
 				MPI_Gatherv(&(tmp1[0][0]), my_rows * my_cols, MPI_DOUBLE, &(globaltmp[0][0]), sendcounts, displs, subarray, 0, MPI_COMM_WORLD);
-
+				
 				// MPI_Barrier(MPI_COMM_WORLD);
 				if (my_rank == 0)
 				{

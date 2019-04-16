@@ -102,6 +102,21 @@ void simulate(double **E, double **E_prev, double **R,
   for (i = 1; i <= n; i++)
     E_prev[m + 1][i] = E_prev[m - 1][i];
 
+  // for (j = 0; j <= m + 1; j++)
+  // {
+  //   for (i = 0; i <= n + 1; i++)
+  //     if ((j == 0 || j == m + 1) and (i == 0 || i == n + 1))
+  //     {
+  //       cout << " "
+  //            << "*";
+  //     }
+  //     else
+  //     {
+  //       cout << " " << E_prev[j][i];
+  //     }
+  //   cout << endl;
+  // }
+
   // Solve for the excitation, the PDE
   for (j = 1; j <= m; j++)
   {
@@ -219,13 +234,6 @@ int main(int argc, char **argv)
       int k = (int)(t / plot_freq);
       if ((t - k * plot_freq) < dt)
       {
-        cout<<"here"<<endl;
-        for (j = 1; j <= m; j++){
-        	for (i = 1; i <= n; i++)
-        		cout<<E[j][i]<<" ";
-        	cout<<endl;
-        }
-
         splot(E, t, niter, m + 2, n + 2);
       }
     }
