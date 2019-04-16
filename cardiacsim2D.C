@@ -218,51 +218,51 @@ void simulate(double **E, double **E_prev, double **R,
 		}
 	}
 
-		// for (j = 0; j <= m + 1; j++)
-		// {
-		// 	cout << "Here " << my_rank << " ----- " << j;
-		// 	for (i = 0; i <= n + 1; i++)
-		// 		if ((j == 0 || j == m+1) and (i == 0 || i ==n+1)){
-		// 			cout << " " << "*";
-		// 		}else{
-		// 			cout << " " << E_prev[j][i];
-		// 		}
-		// 	cout << endl;
-		// }
+	// for (j = 0; j <= m + 1; j++)
+	// {
+	// 	cout << "Here " << my_rank << " ----- " << j;
+	// 	for (i = 0; i <= n + 1; i++)
+	// 		if ((j == 0 || j == m+1) and (i == 0 || i ==n+1)){
+	// 			cout << " " << "*";
+	// 		}else{
+	// 			cout << " " << E_prev[j][i];
+	// 		}
+	// 	cout << endl;
+	// }
 
-		// Solve for the excitation, the PDE
-		for (j = 1; j <= m; j++)
+	// Solve for the excitation, the PDE
+	for (j = 1; j <= m; j++)
+	{
+		for (i = 1; i <= n; i++)
 		{
-			for (i = 1; i <= n; i++)
-			{
-				E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
-			}
+			E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
 		}
+	}
 
-		// // // /*
-		// // // * Solve the ODE, advancing excitation and recovery to the
-		// // // *     next timtestep
-		// // // */
+	// // // /*
+	// // // * Solve the ODE, advancing excitation and recovery to the
+	// // // *     next timtestep
+	// // // */
 
-		for (j = 1; j <= m; j++)
+	for (j = 1; j <= m; j++)
+	{
+		int jIndc = j + (mr * tj);
+		for (i = 1; i <= n; i++)
 		{
-			int jIndc = j + (mr * tj);
-			for (i = 1; i <= n; i++)
-			{
-				int iIndc = i + (mc * ti);
-				E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[jIndc][iIndc]);
-			}
+			int iIndc = i + (mc * ti);
+			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[jIndc][iIndc]);
 		}
+	}
 
-		for (j = 1; j <= m; j++)
+	for (j = 1; j <= m; j++)
+	{
+		int jIndc = j + (mr * tj);
+		for (i = 1; i <= n; i++)
 		{
-			int jIndc = j + (mr * tj);
-			for (i = 1; i <= n; i++)
-			{
-				int iIndc = i + (mc * ti);
-				R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
-			}
+			int iIndc = i + (mc * ti);
+			R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
 		}
+	}
 }
 
 // Main program

@@ -1,0 +1,11 @@
+Grid Size       : 16
+Duration of Sim : 1
+Time step dt    : 0.090725
+Process geometry: 1 x 1
+
+Number of Iterations        : 12
+Elapsed Time (sec)          : 5.50747e-05
+Sustained Gflops Rate       : 1.56181
+Sustained Bandwidth (GB/sec): 1.78492
+
+Max: 0.998924 L2norm: 0.646056
