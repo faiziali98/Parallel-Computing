@@ -320,6 +320,10 @@ int main(int argc, char **argv)
 	int tj = my_rank / sqroot;
 	int ti = my_rank % sqroot;
 
+	// if (my_rank < world_size - 1){
+	// 	my_rows += m - (my_rows*world_size);
+	// }
+
 	myEprev = alloc2D(my_rows + 2, n + 2);
 	myE = alloc2D(my_cols + 2, n + 2);
 
