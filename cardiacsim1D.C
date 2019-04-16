@@ -123,9 +123,6 @@ void simulate(double **E, double **E_prev, double **R,
 				  1, MPI_COMM_WORLD, &recv_request);
 	}
 
-	// MPI_Wait(&send_request, &send_status);
-	// MPI_Wait(&recv_request, &recv_status);
-
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (my_rank == 0)
@@ -143,32 +140,6 @@ void simulate(double **E, double **E_prev, double **R,
 		E_prev[j][0] = E_prev[j][2];
 	for (j = 1; j <= m; j++)
 		E_prev[j][n + 1] = E_prev[j][n - 1];
-
-	// for (j = 1; j <= m; j++)
-	// {
-	// 	cout << "Here " << my_rank << " ----- " << j;
-	// 	for (i = 1; i <= n; i++)
-	// 		cout << " " << E_prev[j][i];
-	// 	cout << endl;
-	// }
-	/*TOP: Wait*/
-	// if (my_rank > 0)
-	// {
-	// 	MPI_Wait(&send_request[2], &send_status[2]);
-	// 	MPI_Wait(&recv_request[2], &recv_status[2]);
-	// }
-
-	// /*BOTTOM: wait*/
-	// if (my_rank < t_p - 1)
-	// {
-	// 	MPI_Wait(&send_request[3], &send_status[3]);
-	// 	MPI_Wait(&recv_request[3], &recv_status[3]);
-	// }
-
-	// for (i=1; i<=n; i++)
-	// 	E_prev[0][i] = E_prev[2][i];
-	// for (i=1; i<=n; i++)
-	// 	E_prev[m+1][i] = E_prev[m-1][i];
 
 	// Solve for the excitation, the PDE
 	for (j = 1; j <= m; j++)
@@ -197,14 +168,6 @@ void simulate(double **E, double **E_prev, double **R,
 		for (i = 1; i <= n; i++)
 			R[rIndc][i] = R[rIndc][i] + dt * (epsilon + M1 * R[rIndc][i] / (E[j][i] + M2)) * (-R[rIndc][i] - kk * E[j][i] * (E[j][i] - b - 1));
 	}
-
-	// for (j = 1; j <= m; j++)
-	// {
-	// 	cout << "Here " << my_rank << " ----- " << j;
-	// 	for (i = 1; i <= n; i++)
-	// 		cout << " " << E[j][i];
-	// 	cout << endl;
-	// }
 }
 
 // Main program
@@ -216,6 +179,7 @@ int main(int argc, char **argv)
 	MPI_Init(NULL, NULL);
 	MPI_Comm_size(MPI_COMM_WORLD, &world_size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
+
 	/*
 	*  Solution arrays
 	*   E is the "Excitation" variable, a voltage
@@ -283,6 +247,19 @@ int main(int argc, char **argv)
 		for (i = 1; i <= n; i++)
 			myEprev[j][i] = E_prev[j + (my_rank * looper)][i];
 
+	int sizes[2] = {m, n+2};
+	int subsizes[2] = {my_rows, n+2};
+	int start[2] = {0, 0};
+
+	MPI_Datatype type, subarray;
+	MPI_Type_create_subarray(2, sizes, subsizes, start, MPI_ORDER_C, MPI_DOUBLE, &type);
+	MPI_Type_create_resized(type, 0, (n+2)*sizeof(double), &subarray);
+	MPI_Type_commit(&subarray);
+
+	int sendcounts[world_size];
+	int displs[world_size];
+
+
 	// for (j = 1; j <= my_rows; j++){
 	// 	for (i = 1; i <= n; i++)
 	// 		cout<<myEprev[j][i]<<" ";
@@ -291,6 +268,16 @@ int main(int argc, char **argv)
 
 	if (my_rank == 0)
 	{
+		for (i = 0; i < world_size; i++)
+			sendcounts[i] = 1;
+		int disp = 0;
+		for (i = 0; i < world_size; i++)
+		{
+			displs[i] = disp;
+			disp += my_rows;
+			// disp += ((m / (world_size / 2)) - 1) * (world_size/2);
+		}
+
 		cout << "Grid Size       : " << n << endl;
 		cout << "Duration of Sim : " << T << endl;
 		cout << "Time step dt    : " << dt << endl;
@@ -300,6 +287,7 @@ int main(int argc, char **argv)
 			cout << "Communication   : DISABLED" << endl;
 		cout << endl;
 	}
+
 	// Start the timer
 	double t0 = getTime();
 
@@ -321,13 +309,16 @@ int main(int argc, char **argv)
 		myE = myEprev;
 		myEprev = tmp;
 
-		if (my_rank == 0)
+		if (plot_freq)
 		{
-			if (plot_freq)
+			int k = (int)(t / plot_freq);
+			if ((t - k * plot_freq) < dt)
 			{
-				int k = (int)(t / plot_freq);
-				if ((t - k * plot_freq) < dt)
+				MPI_Gatherv(&(myE[1][0]), my_rows*(n+2), MPI_DOUBLE, &(E[1][0]), sendcounts, displs, subarray, 0, MPI_COMM_WORLD);
+
+				if (my_rank == 0)
 				{
+
 					splot(E, t, niter, m + 2, n + 2);
 				}
 			}
@@ -358,16 +349,14 @@ int main(int argc, char **argv)
 		cout << "Max: " << gmax << " L2norm: " << glnorm << endl;
 	}
 
-	if (plot_freq)
-	{
-		cout << "\n\nEnter any input to close the program and the plot..." << endl;
-		getchar();
-	}
-
+	MPI_Barrier(MPI_COMM_WORLD);
+	
 	free(E);
 	free(E_prev);
 	free(R);
+	free(myEprev);
+	free(myE);
 
 	MPI_Finalize();
-	// return 0;
+	return 0;
 }

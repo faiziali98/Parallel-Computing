@@ -169,29 +169,6 @@ void simulate(double **E, double **E_prev, double **R,
 				  3, MPI_COMM_WORLD, &recv_request[3]);
 	}
 
-	// if (tj > 0)
-	// {
-	// 	MPI_Wait(&send_request[0], &send_status[0]);
-	// 	MPI_Wait(&recv_request[0], &recv_status[0]);
-	// }
-	// if (tj < sqroot - 1)
-	// {
-	// 	MPI_Wait(&send_request[1], &send_status[1]);
-	// 	MPI_Wait(&recv_request[1], &recv_status[1]);
-	// }
-	// if (ti > 0)
-	// {
-	// 	MPI_Wait(&send_request[2], &send_status[2]);
-	// 	MPI_Wait(&recv_request[2], &recv_status[2]);
-	// }
-	// if (ti < sqroot - 1)
-	// {
-	// 	MPI_Wait(&send_request[3], &send_status[3]);
-	// 	MPI_Wait(&recv_request[3], &recv_status[3]);
-	// }
-	// MPI_Wait(&send_request, &send_status);
-	// MPI_Wait(&recv_request, &recv_status);
-
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	if (tj == 0)
@@ -272,19 +249,6 @@ void simulate(double **E, double **E_prev, double **R,
 			R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
 		}
 	}
-
-	// for (j = 0; j <= m+1; j++)
-	// {
-	// 	cout << "Here " << my_rank << " ----- " << j << " ----- ";
-	// 	for (i = 0; i <= n+1; i++){
-	// 		if (((i==n+1 || i==0) && j == 0 )|| ((i==n+1 || i==0) && j == m+1 )) {
-	// 			cout << " " << "*";
-	// 		}else{
-	// 			cout << " " << E_prev[j][i];
-	// 		}
-	// 	}
-	// 	cout << endl;
-	// }
 }
 
 // Main program
@@ -356,10 +320,6 @@ int main(int argc, char **argv)
 	int tj = my_rank / sqroot;
 	int ti = my_rank % sqroot;
 
-	// if (my_rank < world_size - 1){
-	// 	my_rows += m - (my_rows*world_size);
-	// }
-
 	myEprev = alloc2D(my_rows + 2, n + 2);
 	myE = alloc2D(my_cols + 2, n + 2);
 
@@ -377,9 +337,35 @@ int main(int argc, char **argv)
 	// 		cout<<myEprev[j][i]<<" ";
 	// 	cout<<endl;
 	// }
+	
+	int sizes[2] = {m, n};
+	int subsizes[2] = {my_rows, my_cols};
+	int start[2] = {0, 0};
+
+	MPI_Datatype type, subarray;
+	MPI_Type_create_subarray(2, sizes, subsizes, start, MPI_ORDER_C, MPI_DOUBLE, &type);
+	MPI_Type_create_resized(type, 0, (my_cols) * sizeof(double), &subarray);
+	MPI_Type_commit(&subarray);
+
+	int sendcounts[world_size];
+	int displs[world_size];
 
 	if (my_rank == 0)
 	{
+		for (i = 0; i < world_size; i++)
+			sendcounts[i] = 1;
+
+		int disp = 0;
+		for (i = 0; i < sqroot; i++)
+		{
+			for (j = 0; j < sqroot; j++)
+			{
+				displs[i * (sqroot) + j] = disp;
+				disp += 1;
+			}
+			disp += ((m / (sqroot)) - 1) * (sqroot);
+		}
+
 		cout << "Grid Size       : " << n << endl;
 		cout << "Duration of Sim : " << T << endl;
 		cout << "Time step dt    : " << dt << endl;
@@ -398,6 +384,10 @@ int main(int argc, char **argv)
 	// Integer timestep number
 	int niter = 0;
 
+	double **tmp1, **globaltmp;
+	tmp1 = alloc2D(my_rows, my_cols);
+	globaltmp = alloc2D(m, n);
+
 	while (t < T)
 	{
 		t += dt;
@@ -410,14 +400,24 @@ int main(int argc, char **argv)
 		myE = myEprev;
 		myEprev = tmp;
 
-		if (my_rank == 0)
+		if (plot_freq)
 		{
-			if (plot_freq)
+			int k = (int)(t / plot_freq);
+			if ((t - k * plot_freq) < dt)
 			{
-				int k = (int)(t / plot_freq);
-				if ((t - k * plot_freq) < dt)
+				// MPI_Gatherv(&(myE[1][0]), my_rows * (n + 2), MPI_DOUBLE, &(E[1][0]), sendcounts, displs, subarray, 0, MPI_COMM_WORLD);
+				for (j = 1; j <= my_rows; j++){
+					for (i = 1; i <= my_cols; i++){
+						tmp1[j-1][i-1] = myE[j][i];
+					}
+				}
+
+				MPI_Gatherv(&(tmp1[0][0]), my_rows * my_cols, MPI_DOUBLE, &(globaltmp[0][0]), sendcounts, displs, subarray, 0, MPI_COMM_WORLD);
+
+				// MPI_Barrier(MPI_COMM_WORLD);
+				if (my_rank == 0)
 				{
-					splot(E, t, niter, m + 2, n + 2);
+					splot(globaltmp, t, niter, m, n);
 				}
 			}
 		}
@@ -447,16 +447,16 @@ int main(int argc, char **argv)
 		cout << "Max: " << gmax << " L2norm: " << glnorm << endl;
 	}
 
-	if (plot_freq)
-	{
-		cout << "\n\nEnter any input to close the program and the plot..." << endl;
-		getchar();
-	}
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	free(E);
 	free(E_prev);
 	free(R);
+	free(myEprev);
+	free(myE);
+	free(tmp1);
+	free(globaltmp);
 
 	MPI_Finalize();
-	// return 0;
+	return 0;
 }

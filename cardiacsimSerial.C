@@ -219,6 +219,13 @@ int main(int argc, char **argv)
       int k = (int)(t / plot_freq);
       if ((t - k * plot_freq) < dt)
       {
+        cout<<"here"<<endl;
+        for (j = 1; j <= m; j++){
+        	for (i = 1; i <= n; i++)
+        		cout<<E[j][i]<<" ";
+        	cout<<endl;
+        }
+
         splot(E, t, niter, m + 2, n + 2);
       }
     }
