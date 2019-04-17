@@ -352,7 +352,7 @@ int main(int argc, char **argv)
 		while (ndc % px != 0)
 			ndc++;
 
-		multc = (ndr / px);
+		multc = (ndc / px);
 		if (ti == (px - 1)){
 			my_cols = n - (multc * (px - 1));
 		}
@@ -365,8 +365,6 @@ int main(int argc, char **argv)
 		my_cols = n / px;
 		multc = my_cols;
 	}
-
-	// cout << my_rank << " " <<my_rows<< " " <<my_cols <<endl;
 
 	myEprev = alloc2D(my_rows + 2, my_cols + 2);
 	myE = alloc2D(my_rows + 2, my_cols + 2);

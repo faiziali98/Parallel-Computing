@@ -232,13 +232,24 @@ int main(int argc, char **argv)
 	double dt = (dte < dtr) ? 0.95 * dte : 0.95 * dtr;
 	double alpha = d * dt / (dx * dx);
 
-	int my_rows = m / world_size;
-	int looper = my_rows;
-	double **myE, **myEprev;
+	int my_rows;
 
-	if (my_rank == world_size - 1){
-		my_rows += m - (my_rows*world_size);
+	int ndc = m;
+	while ((ndc % world_size) != 0){
+		ndc++;
 	}
+
+	int looper = (ndc / world_size);
+	if (my_rank == (world_size - 1))
+	{
+		my_rows = m - (looper * (world_size - 1));
+	}
+	else
+	{
+		my_rows = looper;
+	}
+
+	double **myE, **myEprev;
 
 	myEprev = alloc2D(my_rows + 2, n + 2);
 	myE = alloc2D(my_rows + 2, n + 2);
