@@ -33,7 +33,7 @@ CLINK		= $(CC)
 ARCH_FLAGS      = -DLINUX 
 WARNINGS        = 
 # OPTIMIZATION    =  -O3 -ftree-vectorize 
-OPTIMIZATION    =  -O3 
+OPTIMIZATION    =  -O3 -fopenmp
 #DEBUG          = -g
 
 C++FLAGS        += $(INCLUDES) $(ARCH_FLAGS) $(WARNINGS) $(OPTIMIZATION) \

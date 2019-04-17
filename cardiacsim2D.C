@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
+#include <omp.h>
 using namespace std;
 
 // Utilities

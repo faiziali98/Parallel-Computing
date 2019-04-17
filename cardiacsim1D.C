@@ -15,6 +15,7 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
+#include <omp.h>
 using namespace std;
 
 // Utilities
@@ -84,7 +85,7 @@ void simulate(double **E, double **E_prev, double **R,
 			  const double alpha, const int n, const int m, const double kk,
 			  const double dt, const double a, const double epsilon,
 			  const double M1, const double M2, const double b, const int my_rank,
-			  const int t_p, const int looper)
+			  const int t_p, const int looper, const int num_of_threads)
 {
 	int i, j;
 	MPI_Request recv_request;
@@ -125,23 +126,51 @@ void simulate(double **E, double **E_prev, double **R,
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	if (my_rank == 0)
+	#pragma omp parallel shared(E_prev, i, j) num_threads(num_of_threads)
 	{
-		for (i = 1; i <= n; i++)
-			E_prev[0][i] = E_prev[2][i];
-	}
-	if (my_rank == t_p - 1)
-	{
-		for (i = 1; i <= n; i++)
-			E_prev[m + 1][i] = E_prev[m - 1][i];
+		#pragma omp single nowait
+		{	
+			if (my_rank == 0)
+			{
+				#pragma omp task shared(E_prev) firstprivate(i) 
+				{
+					for (i = 1; i <= n; i++)
+						E_prev[0][i] = E_prev[2][i];
+				}
+			}
+
+			if (my_rank == t_p - 1)
+			{
+				#pragma omp task shared(E_prev) firstprivate(i) 
+				{
+					
+					for (i = 1; i <= n; i++)
+						E_prev[m + 1][i] = E_prev[m - 1][i];
+				}
+			}
+
+			#pragma omp task shared(E_prev) firstprivate(j) 
+			{
+				for (j = 1; j <= m; j++)
+				{
+					E_prev[j][0] = E_prev[j][2];
+				}
+			}
+
+			#pragma omp task shared(E_prev) firstprivate(j) 
+			{
+				for (j = 1; j <= m; j++) 
+				{
+					E_prev[j][n + 1] = E_prev[j][n - 1];
+				}
+			}
+		}
+		#pragma omp taskwait
 	}
 
-	for (j = 1; j <= m; j++)
-		E_prev[j][0] = E_prev[j][2];
-	for (j = 1; j <= m; j++)
-		E_prev[j][n + 1] = E_prev[j][n - 1];
-
+	
 	// Solve for the excitation, the PDE
+	#pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = 1; j <= m; j++)
 	{
 		for (i = 1; i <= n; i++)
@@ -155,18 +184,24 @@ void simulate(double **E, double **E_prev, double **R,
 	// *     next timtestep
 	// */
 
+	#pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = 1; j <= m; j++)
 	{
-		int rIndc = j + (my_rank * looper);
 		for (i = 1; i <= n; i++)
+		{
+			int rIndc = j + (my_rank * looper);
 			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[rIndc][i]);
+		}
 	}
 
+	#pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = 1; j <= m; j++)
 	{
-		int rIndc = j + (my_rank * looper);
 		for (i = 1; i <= n; i++)
+		{
+			int rIndc = j + (my_rank * looper);
 			R[rIndc][i] = R[rIndc][i] + dt * (epsilon + M1 * R[rIndc][i] / (E[j][i] + M2)) * (-R[rIndc][i] - kk * E[j][i] * (E[j][i] - b - 1));
+		}
 	}
 }
 
@@ -197,9 +232,9 @@ int main(int argc, char **argv)
 	int plot_freq = 0;
 	int px = 1, py = 1;
 	int no_comm = 0;
-	int num_threads = 1;
+	int num_of_threads = 1;
 
-	cmdLine(argc, argv, T, n, px, py, plot_freq, no_comm, num_threads);
+	cmdLine(argc, argv, T, n, px, py, plot_freq, no_comm, num_of_threads);
 	m = n;
 	// Allocate contiguous memory for solution arrays
 	// The computational box is defined on [1:m+1,1:n+1]
@@ -211,14 +246,17 @@ int main(int argc, char **argv)
 
 	int i, j;
 	// Initialization
+	// #pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads) 
 	for (j = 1; j <= m; j++)
 		for (i = 1; i <= n; i++)
 			E_prev[j][i] = R[j][i] = 0;
 
+	// #pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = 1; j <= m; j++)
 		for (i = n / 2 + 1; i <= n; i++)
 			E_prev[j][i] = 1.0;
 
+	// #pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = m / 2 + 1; j <= m; j++)
 		for (i = 1; i <= n; i++)
 			R[j][i] = 1.0;
@@ -254,6 +292,7 @@ int main(int argc, char **argv)
 	myEprev = alloc2D(my_rows + 2, n + 2);
 	myE = alloc2D(my_rows + 2, n + 2);
 
+	// #pragma omp parallel for collapse(2) private(i,j) num_threads(num_of_threads)
 	for (j = 1; j <= my_rows; j++)
 		for (i = 1; i <= n; i++)
 			myEprev[j][i] = E_prev[j + (my_rank * looper)][i];
@@ -313,7 +352,7 @@ int main(int argc, char **argv)
 		t += dt;
 		niter++;
 
-		simulate(myE, myEprev, R, alpha, n, my_rows, kk, dt, a, epsilon, M1, M2, b, my_rank, world_size, looper);
+		simulate(myE, myEprev, R, alpha, n, my_rows, kk, dt, a, epsilon, M1, M2, b, my_rank, world_size, looper, num_of_threads);
 
 		//swap current E with previous E
 		double **tmp = myE;
