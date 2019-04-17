@@ -174,9 +174,9 @@ void simulate(double **E, double **E_prev, double **R,
 			MPI_Irecv(tRecvr, m, MPI_DOUBLE, src_proc,
 					3, MPI_COMM_WORLD, &recv_request[3]);
 		}
-	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(MPI_COMM_WORLD);
+	}
 
 	if (tj == 0)
 	{
@@ -347,7 +347,7 @@ int main(int argc, char **argv)
 
 		multr = (ndr / py);
 		if (tj == (py - 1)){
-			my_rows = n - (multr * (py - 1));
+			my_rows = m - (multr * (py - 1));
 		}else{
 			my_rows = multr;
 		}
@@ -364,9 +364,9 @@ int main(int argc, char **argv)
 		while (ndc % px != 0)
 			ndc++;
 
-		multc = (ndr / py);
+		multc = (ndr / px);
 		if (ti == (px - 1)){
-			my_cols = n - (multc * (py - 1));
+			my_cols = n - (multc * (px - 1));
 		}
 		else{
 			my_cols = multc;
