@@ -218,18 +218,6 @@ void simulate(double **E, double **E_prev, double **R,
 		}
 	}
 
-	// for (j = 0; j <= m + 1; j++)
-	// {
-	// 	cout << "Here " << my_rank << " ----- " << j;
-	// 	for (i = 0; i <= n + 1; i++)
-	// 		if ((j == 0 || j == m+1) and (i == 0 || i ==n+1)){
-	// 			cout << " " << "*";
-	// 		}else{
-	// 			cout << " " << E_prev[j][i];
-	// 		}
-	// 	cout << endl;
-	// }
-
 	// Solve for the excitation, the PDE
 	for (j = 1; j <= m; j++)
 	{
@@ -391,13 +379,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	// for (j = 1; j <= my_rows; j++){
-	// 	cout << my_rank << " ------ ";
-	// 	for (i = 1; i <= my_cols; i++)
-	// 		cout<<myEprev[j][i]<<" ";
-	// 	cout<<endl;
-	// }
-	
 	int sizes[2] = {m, n};
 	int subsizes[2] = {my_rows, my_cols};
 	int start[2] = {0, 0};
