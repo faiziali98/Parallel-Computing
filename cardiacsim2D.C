@@ -84,7 +84,7 @@ void simulate(double **E, double **E_prev, double **R,
 			  const double alpha, const int n, const int m, const double kk,
 			  const double dt, const double a, const double epsilon,
 			  const double M1, const double M2, const double b, const int my_rank,
-			  const int px, const int py, const int mr, const int mc, const int ncomm)
+			  const int px, const int py, const int ncomm)
 {
 	int i, j;
 	double *tSendl, *tRecvl, *tSendr, *tRecvr;
@@ -234,21 +234,17 @@ void simulate(double **E, double **E_prev, double **R,
 
 	for (j = 1; j <= m; j++)
 	{
-		int jIndc = j + (mr * tj);
 		for (i = 1; i <= n; i++)
 		{
-			int iIndc = i + (mc * ti);
-			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[jIndc][iIndc]);
+			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[j][i]);
 		}
 	}
 
 	for (j = 1; j <= m; j++)
 	{
-		int jIndc = j + (mr * tj);
 		for (i = 1; i <= n; i++)
 		{
-			int iIndc = i + (mc * ti);
-			R[jIndc][iIndc] = R[jIndc][iIndc] + dt * (epsilon + M1 * R[jIndc][iIndc] / (E[j][i] + M2)) * (-R[jIndc][iIndc] - kk * E[j][i] * (E[j][i] - b - 1));
+			R[j][i] = R[j][i] + dt * (epsilon + M1 * R[j][i] / (E[j][i] + M2)) * (-R[j][i] - kk * E[j][i] * (E[j][i] - b - 1));
 		}
 	}
 }
@@ -319,7 +315,7 @@ int main(int argc, char **argv)
 	double dt = (dte < dtr) ? 0.95 * dte : 0.95 * dtr;
 	double alpha = d * dt / (dx * dx);
 
-	double **myE, **myEprev;
+	double **myE, **myEprev, **myR;
 
 	int tj = my_rank / px;
 	int ti = my_rank % px;
@@ -368,12 +364,14 @@ int main(int argc, char **argv)
 
 	myEprev = alloc2D(my_rows + 2, my_cols + 2);
 	myE = alloc2D(my_rows + 2, my_cols + 2);
+	myR = alloc2D(my_rows + 2, my_cols + 2);
 
 	for (j = 1; j <= my_rows; j++)
 	{
 		for (i = 1; i <= my_cols; i++)
 		{
 			myEprev[j][i] = E_prev[j + (multr * tj)][i + (multc * ti)];
+			myR[j][i] = R[j + (multr * tj)][i + (multc * ti)];
 		}
 	}
 
@@ -437,8 +435,8 @@ int main(int argc, char **argv)
 		t += dt;
 		niter++;
 
-		simulate(myE, myEprev, R, alpha, my_cols, my_rows, kk, dt, a, epsilon, 
-				M1, M2, b, my_rank, px, py, multr, multc, no_comm);
+		simulate(myE, myEprev, myR, alpha, my_cols, my_rows, kk, dt, a, epsilon, 
+				M1, M2, b, my_rank, px, py, no_comm);
 
 		//swap current E with previous E
 		double **tmp = myE;

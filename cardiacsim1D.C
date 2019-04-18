@@ -84,7 +84,7 @@ void simulate(double **E, double **E_prev, double **R,
 			  const double alpha, const int n, const int m, const double kk,
 			  const double dt, const double a, const double epsilon,
 			  const double M1, const double M2, const double b, const int my_rank,
-			  const int t_p, const int looper)
+			  const int t_p)
 {
 	int i, j;
 	MPI_Request recv_request;
@@ -123,8 +123,6 @@ void simulate(double **E, double **E_prev, double **R,
 				  1, MPI_COMM_WORLD, &recv_request);
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
-
 	if (my_rank == 0)
 	{
 		for (i = 1; i <= n; i++)
@@ -141,6 +139,8 @@ void simulate(double **E, double **E_prev, double **R,
 	for (j = 1; j <= m; j++)
 		E_prev[j][n + 1] = E_prev[j][n - 1];
 
+	MPI_Barrier(MPI_COMM_WORLD);
+
 	// Solve for the excitation, the PDE
 	for (j = 1; j <= m; j++)
 	{
@@ -150,23 +150,44 @@ void simulate(double **E, double **E_prev, double **R,
 		}
 	}
 
+	// int blocksizem = m / 3;
+	// int blocksizen = n / 3;
+
+	// // Solve for the excitation, the PDE
+	// for (int jj = 1; jj <= m; jj += blocksizem)
+	// {
+	// 	// cout << jj <<endl;
+	// 	for (int ii = 1; ii <= n; ii += blocksizen)
+	// 	{
+	// 		// cout << my_rank << " " << jj << " " << ii << endl;
+	// 		for (j = jj; j < jj + blocksizem; j++)
+	// 		{
+	// 			for (i = ii; i < ii + blocksizen; i++)
+	// 			{
+	// 				// cout<< my_rank << " " << j<< " "<<i<<endl;
+	// 				E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
+	// 			}
+	// 		}
+	// 	}
+	// }
 	// /*
 	// * Solve the ODE, advancing excitation and recovery to the
 	// *     next timtestep
 	// */
 
+	// int blocksizem = m / 2;
+	// int blocksizen = n / 2;
+
 	for (j = 1; j <= m; j++)
 	{
-		int rIndc = j + (my_rank * looper);
 		for (i = 1; i <= n; i++)
-			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[rIndc][i]);
+			E[j][i] = E[j][i] - dt * (kk * E[j][i] * (E[j][i] - a) * (E[j][i] - 1) + E[j][i] * R[j][i]);
 	}
 
 	for (j = 1; j <= m; j++)
 	{
-		int rIndc = j + (my_rank * looper);
 		for (i = 1; i <= n; i++)
-			R[rIndc][i] = R[rIndc][i] + dt * (epsilon + M1 * R[rIndc][i] / (E[j][i] + M2)) * (-R[rIndc][i] - kk * E[j][i] * (E[j][i] - b - 1));
+			R[j][i] = R[j][i] + dt * (epsilon + M1 * R[j][i] / (E[j][i] + M2)) * (-R[j][i] - kk * E[j][i] * (E[j][i] - b - 1));
 	}
 }
 
@@ -249,14 +270,18 @@ int main(int argc, char **argv)
 		my_rows = looper;
 	}
 
-	double **myE, **myEprev;
+	double **myE, **myEprev, **myR;
 
 	myEprev = alloc2D(my_rows + 2, n + 2);
 	myE = alloc2D(my_rows + 2, n + 2);
+	myR = alloc2D(my_rows + 2, n + 2);
 
-	for (j = 1; j <= my_rows; j++)
-		for (i = 1; i <= n; i++)
+	for (j = 1; j <= my_rows; j++){
+		for (i = 1; i <= n; i++){
 			myEprev[j][i] = E_prev[j + (my_rank * looper)][i];
+			myR[j][i] = R[j + (my_rank * looper)][i];
+		}
+	}
 
 	int sizes[2] = {m, n+2};
 	int subsizes[2] = {my_rows, n+2};
@@ -313,7 +338,7 @@ int main(int argc, char **argv)
 		t += dt;
 		niter++;
 
-		simulate(myE, myEprev, R, alpha, n, my_rows, kk, dt, a, epsilon, M1, M2, b, my_rank, world_size, looper);
+		simulate(myE, myEprev, myR, alpha, n, my_rows, kk, dt, a, epsilon, M1, M2, b, my_rank, world_size);
 
 		//swap current E with previous E
 		double **tmp = myE;
