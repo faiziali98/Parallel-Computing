@@ -92,7 +92,6 @@ void simulate(double **E, double **E_prev, double **R,
 	int tj = my_rank / px;
 	int ti = my_rank % px;
 
-
 	MPI_Request recv_request[4];
 	MPI_Request send_request[4];
 	MPI_Status send_status[4];
@@ -106,7 +105,7 @@ void simulate(double **E, double **E_prev, double **R,
 	*/
 
 	// For Top row
-	if (ncomm == 0){
+	if (ncomm == 0){		
 		if (tj > 0)
 		{
 			int dest_proc = my_rank - px;
@@ -175,33 +174,49 @@ void simulate(double **E, double **E_prev, double **R,
 					3, MPI_COMM_WORLD, &recv_request[3]);
 		}
 
-		MPI_Barrier(MPI_COMM_WORLD);
-	}
+		if (tj > 0)
+		{
+			MPI_Wait(&(recv_request[0]), &(recv_status[0]));
+			MPI_Wait(&(send_request[0]), &(send_status[0]));
+		}
+		if (tj < py - 1)
+		{
+			MPI_Wait(&(recv_request[1]), &(recv_status[1]));
+			MPI_Wait(&(send_request[1]), &(send_status[1]));
+		}
 
-	if (tj == 0)
-	{
-		for (i = 1; i <= n; i++)
-			E_prev[0][i] = E_prev[2][i];
-	}
-	if (tj == py - 1)
-	{
-		for (i = 1; i <= n; i++)
-			E_prev[m + 1][i] = E_prev[m - 1][i];
-	}
+		if (ti > 0)
+		{
+			MPI_Wait(&(recv_request[2]), &(recv_status[2]));
+			MPI_Wait(&(send_request[2]), &(send_status[2]));
+		}
+		if (ti < px - 1)
+		{
+			MPI_Wait(&(recv_request[3]), &(recv_status[3]));
+			MPI_Wait(&(send_request[3]), &(send_status[3]));
+		}
 
-	if (ti == 0)
-	{
-		for (j = 1; j <= m; j++)
-			E_prev[j][0] = E_prev[j][2];
-	}
-	if (ti == px - 1)
-	{
-		for (j = 1; j <= m; j++)
-			E_prev[j][n + 1] = E_prev[j][n - 1];
-	}
+		if (tj == 0)
+		{
+			for (i = 1; i <= n; i++)
+				E_prev[0][i] = E_prev[2][i];
+		}
+		if (tj == py - 1)
+		{
+			for (i = 1; i <= n; i++)
+				E_prev[m + 1][i] = E_prev[m - 1][i];
+		}
 
-	if (ncomm == 0)
-	{
+		if (ti == 0)
+		{
+			for (j = 1; j <= m; j++)
+				E_prev[j][0] = E_prev[j][2];
+		}
+		if (ti == px - 1)
+		{
+			for (j = 1; j <= m; j++)
+				E_prev[j][n + 1] = E_prev[j][n - 1];
+		}
 		if (ti > 0)
 		{
 			for (j = 1; j <= m; j++)
@@ -216,6 +231,17 @@ void simulate(double **E, double **E_prev, double **R,
 				E_prev[j][n + 1] = tRecvr[j - 1];
 			}
 		}
+		
+	} else {
+		for (j = 1; j <= m; j++)
+		    E_prev[j][0] = 1;
+		for (j = 1; j <= m; j++)
+		    E_prev[j][n + 1] = 1;
+
+		for (i = 1; i <= n; i++)
+		    E_prev[0][i] = 1;
+		for (i = 1; i <= n; i++)
+		    E_prev[m + 1][i] = 1;
 	}
 
 	// Solve for the excitation, the PDE
@@ -227,10 +253,10 @@ void simulate(double **E, double **E_prev, double **R,
 		}
 	}
 
-	// // // /*
-	// // // * Solve the ODE, advancing excitation and recovery to the
-	// // // *     next timtestep
-	// // // */
+	// /*
+	// * Solve the ODE, advancing excitation and recovery to the
+	// *     next timtestep
+	// */
 
 	for (j = 1; j <= m; j++)
 	{
@@ -465,6 +491,7 @@ int main(int argc, char **argv)
 		}
 	} //end of while loop
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	double time_elapsed = getTime() - t0;
 
 	double mx;
@@ -472,8 +499,9 @@ int main(int argc, char **argv)
 	double l2norm = stats(myEprev, my_rows, my_cols, &mx);
 
 	MPI_Reduce(&mx, &gmax, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
-	MPI_Reduce(&l2norm, &glnorm, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-
+	MPI_Reduce(&l2norm, &glnorm, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD); 
+	
+	
 	if (my_rank == 0)
 	{
 		double Gflops = (double)(niter * (1E-9 * n * n) * 28.0) / time_elapsed;
