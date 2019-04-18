@@ -88,10 +88,10 @@ void simulate(double **E, double **E_prev, double **R,
 			  const int t_p, const int looper, const int num_of_threads)
 {
 	int i, j;
-	MPI_Request recv_request;
-	MPI_Request send_request;
-	MPI_Status send_status;
-	MPI_Status recv_status;
+	MPI_Request recv_request[2];
+	MPI_Request send_request[2];
+	MPI_Status send_status[2];
+	MPI_Status recv_status[2];
 
 	/* 
 	* Copy data from boundary of the computational box 
@@ -107,9 +107,9 @@ void simulate(double **E, double **E_prev, double **R,
 		int src_proc = dest_proc;
 
 		MPI_Isend(&(E_prev[1][1]), n, MPI_DOUBLE, dest_proc,
-				  1, MPI_COMM_WORLD, &send_request);
+				  1, MPI_COMM_WORLD, &send_request[0]);
 		MPI_Irecv(&(E_prev[0][1]), n, MPI_DOUBLE, src_proc,
-				  2, MPI_COMM_WORLD, &recv_request);
+				  2, MPI_COMM_WORLD, &recv_request[0]);
 	}
 
 	//For Bottom row
@@ -119,12 +119,21 @@ void simulate(double **E, double **E_prev, double **R,
 		int src_proc = dest_proc;
 
 		MPI_Isend(&(E_prev[m][1]), n, MPI_DOUBLE, dest_proc,
-				  2, MPI_COMM_WORLD, &send_request);
+				  2, MPI_COMM_WORLD, &send_request[1]);
 		MPI_Irecv(&(E_prev[m + 1][1]), n, MPI_DOUBLE, src_proc,
-				  1, MPI_COMM_WORLD, &recv_request);
+				  1, MPI_COMM_WORLD, &recv_request[1]);
 	}
 
-	MPI_Barrier(MPI_COMM_WORLD);
+	if (my_rank > 0)
+	{
+		MPI_Wait(&(recv_request[0]), &(recv_status[0]));
+		MPI_Wait(&(send_request[0]), &(send_status[0]));
+	}
+	if (my_rank < t_p - 1)
+	{
+		MPI_Wait(&(recv_request[1]), &(recv_status[1]));
+		MPI_Wait(&(send_request[1]), &(send_status[1]));
+	}
 
 	#pragma omp parallel shared(E_prev, i, j) num_threads(num_of_threads)
 	{
@@ -375,6 +384,7 @@ int main(int argc, char **argv)
 		}
 	} //end of while loop
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	double time_elapsed = getTime() - t0;
 
 	double mx;

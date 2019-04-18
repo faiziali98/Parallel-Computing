@@ -176,7 +176,27 @@ void simulate(double **E, double **E_prev, double **R,
 					3, MPI_COMM_WORLD, &recv_request[3]);
 		}
 
-		MPI_Barrier(MPI_COMM_WORLD);
+		if (tj > 0)
+		{
+			MPI_Wait(&(recv_request[0]), &(recv_status[0]));
+			MPI_Wait(&(send_request[0]), &(send_status[0]));
+		}
+		if (tj < py - 1)
+		{
+			MPI_Wait(&(recv_request[1]), &(recv_status[1]));
+			MPI_Wait(&(send_request[1]), &(send_status[1]));
+		}
+
+		if (ti > 0)
+		{
+			MPI_Wait(&(recv_request[2]), &(recv_status[2]));
+			MPI_Wait(&(send_request[2]), &(send_status[2]));
+		}
+		if (ti < px - 1)
+		{
+			MPI_Wait(&(recv_request[3]), &(recv_status[3]));
+			MPI_Wait(&(send_request[3]), &(send_status[3]));
+		}
 	}
 
 	#pragma omp parallel shared(E_prev, tj, ti, i, j) num_threads(num_of_threads)
@@ -502,6 +522,7 @@ int main(int argc, char **argv)
 		}
 	} //end of while loop
 
+	MPI_Barrier(MPI_COMM_WORLD);
 	double time_elapsed = getTime() - t0;
 
 	double mx;
