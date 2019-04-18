@@ -13,6 +13,8 @@
 #include <iostream>
 #include <iomanip>
 #include <string.h>
+#include <emmintrin.h>
+#include <malloc.h>
 #include <math.h>
 #include <sys/time.h>
 using namespace std;
@@ -142,16 +144,18 @@ void simulate(double **E, double **E_prev, double **R,
 	MPI_Barrier(MPI_COMM_WORLD);
 
 	// Solve for the excitation, the PDE
+	// _mm_prefetch((double *)(E_prev + m), _MM_HINT_T0);
 	for (j = 1; j <= m; j++)
 	{
+		// _mm_prefetch((double *)(E_prev[j] + n), _MM_HINT_T0);
 		for (i = 1; i <= n; i++)
 		{
 			E[j][i] = E_prev[j][i] + alpha * (E_prev[j][i + 1] + E_prev[j][i - 1] - 4 * E_prev[j][i] + E_prev[j + 1][i] + E_prev[j - 1][i]);
 		}
 	}
 
-	// int blocksizem = m / 3;
-	// int blocksizen = n / 3;
+	// int blocksizem = m / 2;
+	// int blocksizen = n / 2;
 
 	// // Solve for the excitation, the PDE
 	// for (int jj = 1; jj <= m; jj += blocksizem)
@@ -162,6 +166,9 @@ void simulate(double **E, double **E_prev, double **R,
 	// 		// cout << my_rank << " " << jj << " " << ii << endl;
 	// 		for (j = jj; j < jj + blocksizem; j++)
 	// 		{
+	// 			_mm_prefetch((double *)(E[j] + ii), _MM_HINT_T0);
+	// 			// _mm_prefetch((double *)(E[j + 1] + ii), _MM_HINT_T0);
+	// 			// _mm_prefetch((double *)(E[j - 1] + ii), _MM_HINT_T0);
 	// 			for (i = ii; i < ii + blocksizen; i++)
 	// 			{
 	// 				// cout<< my_rank << " " << j<< " "<<i<<endl;
@@ -178,6 +185,7 @@ void simulate(double **E, double **E_prev, double **R,
 	// int blocksizem = m / 2;
 	// int blocksizen = n / 2;
 
+	
 	for (j = 1; j <= m; j++)
 	{
 		for (i = 1; i <= n; i++)
@@ -186,6 +194,7 @@ void simulate(double **E, double **E_prev, double **R,
 
 	for (j = 1; j <= m; j++)
 	{
+		// _mm_prefetch((double *)(R[j] + n), _MM_HINT_T0);
 		for (i = 1; i <= n; i++)
 			R[j][i] = R[j][i] + dt * (epsilon + M1 * R[j][i] / (E[j][i] + M2)) * (-R[j][i] - kk * E[j][i] * (E[j][i] - b - 1));
 	}
